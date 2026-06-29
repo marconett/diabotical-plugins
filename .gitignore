@@ -1,0 +1,7 @@
+# build output
+/build/
+/dist/
+*.dll
+
+# macOS
+.DS_Store
