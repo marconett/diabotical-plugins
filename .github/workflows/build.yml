@@ -1,0 +1,84 @@
+name: build & release
+
+# On a semver tag (vX.Y.Z), build the default patch-DLL plugin set and publish
+# it as a GitHub release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to create releases
+
+env:
+  PLUGINS: demo_spec_switch demo_gzip_tail replay_reserve weeball_throw_demo
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.13.0
+
+      - name: Build default plugin set
+        run: ./build.sh $PLUGINS
+
+      - name: Stage release files (dbt_plugins.dll + installer)
+        run: |
+          mkdir -p dist
+          cp build/GFSDK_SSAO_D3D11.win64.dll dist/dbt_plugins.dll
+          cp installer/install.bat dist/install.bat
+          cp installer/install.sh dist/install.sh
+          chmod +x dist/install.sh
+          version="${GITHUB_REF_NAME}"
+          sed "s/__VERSION__/${version}/" installer/readme.txt > dist/readme.txt
+          # bundle everything users need into a single archive (files at zip root)
+          (cd dist && zip -j "dbt_plugins_${version}.zip" dbt_plugins.dll install.bat install.sh readme.txt)
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: dbt_plugins
+          path: |
+            dist/dbt_plugins.dll
+            dist/install.bat
+            dist/install.sh
+            dist/readme.txt
+          if-no-files-found: error
+
+      - name: Build release notes from plugin CHANGELOGs
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          notes=dist/plugin_notes.md
+          echo "## Plugin changes" > "$notes"
+          for p in $PLUGINS; do
+            f="plugins/$p/plugin.c"
+            [ -f "$f" ] || continue
+            # Extract the lines of a leading "/* CHANGELOG ... */" comment, one
+            # bullet per line. Plugins without such a comment contribute nothing.
+            changelog=$(awk '
+              /\/\* CHANGELOG/ { inblk=1; next }
+              inblk && /\*\// { inblk=0; exit }
+              inblk { line=$0; sub(/^[[:space:]]*\*[[:space:]]?/, "", line); if (line != "") print line }
+            ' "$f")
+            [ -z "$changelog" ] && continue
+            echo "" >> "$notes"
+            echo "### $p" >> "$notes"
+            while IFS= read -r l; do echo "- $l" >> "$notes"; done <<< "$changelog"
+          done
+          echo "----- generated release notes -----"
+          cat "$notes"
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body_path: dist/plugin_notes.md
+          generate_release_notes: true
+          files: dist/dbt_plugins_${{ github.ref_name }}.zip
