@@ -63,6 +63,16 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, LPVOID reserved)
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(hinst);
         pk_set_self(hinst);
+
+        /* Early hooks run inline, before the EXE entry point, for writes the
+         * engine would otherwise read during its own startup.  We are under the
+         * loader lock here, so they must stay tiny (see PK_PLUGIN_EARLY). */
+        for (int i = 0; i < pk_plugin_count; i++) {
+            if (!pk_plugins[i].early) continue;
+            int r = pk_plugins[i].early();
+            pk_logf("  [%s] early %s", pk_plugins[i].name, r ? "applied" : "FAILED");
+        }
+
         HANDLE t = CreateThread(NULL, 0, pk_thread, NULL, 0, NULL);
         if (t) CloseHandle(t);
     }

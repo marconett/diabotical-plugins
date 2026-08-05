@@ -76,14 +76,22 @@ void pk_set_self(void* hmodule);  /* called by the loader to locate the log */
 
 /* --- plugin registration -------------------------------------------------
  * Each plugin defines exactly one:   PK_PLUGIN(my_name) { ...; return PK_OK; }
- * build.sh generates pk_registry.c listing the selected plugins. */
+ * build.sh generates pk_registry.c listing the selected plugins.
+ *
+ * A plugin MAY also define an optional early hook:
+ *     PK_PLUGIN_EARLY(my_name) { ...; return PK_OK; }
+ * It runs inline in DllMain, before the EXE entry point, instead of on the
+ * worker thread that races engine init.  Use it only for data the engine reads
+ * during its own startup (boost option-name strings, console command map keys),
+ * and keep it to pk_verify/pk_write/pk_apply -- it runs under the loader lock. */
 typedef int (*pk_init_fn)(void);
-typedef struct { const char* name; pk_init_fn init; } pk_plugin;
+typedef struct { const char* name; pk_init_fn init; pk_init_fn early; } pk_plugin;
 
 extern const pk_plugin pk_plugins[];
 extern const int       pk_plugin_count;
 
-#define PK_PLUGIN(NAME) int pk_init_##NAME(void)
+#define PK_PLUGIN(NAME)       int pk_init_##NAME(void)
+#define PK_PLUGIN_EARLY(NAME) int pk_early_##NAME(void)
 
 #ifdef __cplusplus
 }
