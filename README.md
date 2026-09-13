@@ -9,7 +9,7 @@ Works on **Windows** and on **Linux (Proton)**, no launch options needed.
 | Plugin | What it does |
 |---|---|
 | **demo_spec_switch** | Allow cycling through other players pov in client side recorded demos (just press **SPACE**) |
-| **demo_gzip_tail** | Fixed a bug where client side recorded demos always ended prematurely, preventing the end of the game to be recorded. |
+| **replay_async_finalize** | Fixes the game freezing for several seconds at the end of a match when client side demo recording is enabled (the demo is now written on a background thread). Also fixes client side recorded demos ending prematurely, so the end of the game is recorded. |
 | **replay_reserve** | Fixed a bug that could lead to the client lagging for a short time when client demo recording is enabled. |
 | **weeball_throw_demo** | Fixes the first-person weeball throw animation and cooldown not showing during demo playback. |
 

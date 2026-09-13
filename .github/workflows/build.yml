@@ -11,7 +11,7 @@ permissions:
   contents: write   # needed to create releases
 
 env:
-  PLUGINS: demo_spec_switch demo_gzip_tail replay_reserve weeball_throw_demo
+  PLUGINS: demo_spec_switch replay_async_finalize replay_reserve weeball_throw_demo
 
 jobs:
   build:
